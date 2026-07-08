@@ -292,6 +292,81 @@ See the tag reference and full list: https://map.longdo.com/docs/javascript/mark
 
 ---
 
+## Custom Map Layer Menu (longdo.LayerSelector)
+
+In enterprise application development, relying on the map platform's default UI components often limits flexibility. The native Longdo Map `LayerSelector` automatically bundles all Longdo Map and third-party layers into a single pre-defined layout.
+To achieve complete data governance and tailored user experiences, developers need the ability to build a Custom Layer Selector. Implementing a custom selector allows you to override the default component completely, enabling you to:
+- Enforce Whitelisting: Explicitly define which layers are accessible (e.g., hiding paid/premium "Non-free" layers like Google Maps or GISTDA to eliminate accidental API billing risks).
+- Tailor UI/UX: Rearrange, rename, or group layers (such as Vector vs. Raster) to match your application's design system and user workflows.
+- Control Layer Logic: Dynamically manage how baseline map data and informational overlays (like real-time traffic) interact with one another.
+
+Using the official `longdo.MenuBar` class, we can cleanly disable the native picker and inject a custom-tailored layer orchestration interface.
+
+```javascript
+// 1. Initialize the Longdo Map instance
+var map = new longdo.Map({
+  placeholder: document.getElementById("map"),
+});
+
+// 2. Configure the Custom UI once the map is fully loaded
+map.Event.bind("ready", function () {
+  
+  // Cleanly hide the default system Layer Selector
+  map.Ui.LayerSelector.visible(false);
+  
+  // Construct a brand new MenuBar with permitted layers only
+  const customLayerSelector = new longdo.MenuBar({
+    button: [
+      { label: 'แผนที่', value: 'NORMAL', type: longdo.ButtonType.Radio },
+      { label: 'ดาวเทียม', value: 'HARD', type: longdo.ButtonType.Radio },
+      { label: 'จราจร', value: 'TRAFFIC', type: longdo.ButtonType.Radio }
+    ],
+    dropdown: [
+      { label: 'พาสเทล', value: 'PASTEL', type: longdo.ButtonType.Radio },
+      { label: 'พาสเทล ถนนเทา', value: 'PASTEL_GRAY', type: longdo.ButtonType.Radio },
+      { label: 'สว่าง', value: 'LIGHT', type: longdo.ButtonType.Radio },
+      { label: 'กลางคืน', value: 'NIGHT', type: longdo.ButtonType.Radio },
+      { label: 'มืด', value: 'DARK', type: longdo.ButtonType.Radio },
+      { label: 'เขตการปกครอง', value: 'POLITICAL', type: longdo.ButtonType.Radio },
+      { label: 'OpenStreetMap (Longdo)', value: 'OSM', type: longdo.ButtonType.Radio },
+      { label: 'Raster', type: longdo.ButtonType.Group },
+      { label: 'สถานที่', value: 'RASTER_POI', type: longdo.ButtonType.Radio },
+      { label: 'ภาพถ่าย', value: 'THAICHOTE', type: longdo.ButtonType.Radio },
+      { label: 'OpenStreetMap', value: 'RASTER_OSM', type: longdo.ButtonType.Radio }
+    ],
+    dropdownLabel: "อื่นๆ",
+    change: (currentMenuItem, lastMenuItem) => {
+      // Cleanup Logic: Remove the overlay layer if switching away from TRAFFIC
+      if (lastMenuItem && lastMenuItem.value === 'TRAFFIC') {
+        map.Layers.remove(longdo.Layers[lastMenuItem.value]);
+      }
+
+      // Layer Switching Logic
+      switch (currentMenuItem.value) {
+        case 'TRAFFIC': {
+          // Traffic overlay requires a solid base layer underneath (e.g., LIGHT)
+          map.Layers.setBase(longdo.Layers.LIGHT);
+          map.Layers.add(longdo.Layers[currentMenuItem.value]);
+          break;
+        }
+        default: {
+          // Standard base layer switch
+          map.Layers.setBase(longdo.Layers[currentMenuItem.value]);
+          break;
+        }
+      }
+    }
+  });
+  
+  // 3. Inject the custom component into the map UI container
+  map.Ui.add(customLayerSelector);
+});
+```
+
+When customizing your MenuBar, you can freely mix, match, and map your own text labels to any underlying layer key supported by the platform. For a complete, up-to-date reference of all pre-defined layer strings (such as NORMAL, TRAFFIC, WMS, etc.) provided by the API, please refer to the official documentation: [Longdo Map API Documentation - Layers Section](https://api.longdo.com/map3/doc.html#Layers)
+
+---
+
 ## Stretching low-zoom layer imagery (API2)
 
 Display a raster layer at deeper zoom levels than it natively provides by
