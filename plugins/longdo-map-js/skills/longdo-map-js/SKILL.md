@@ -65,22 +65,33 @@ API have loaded. Bind to the `ready` event before touching the map.
 
 ---
 
-## HTML marker icons that don't drift on zoom
+## HTML marker icons that sit exactly on their coordinate
 
-**The problem:** `offset: { x: -W/2, y: -H/2 }` (negative values to centre a
-large icon) causes visible zoom-drift in Longdo Map v3. The larger the icon,
-the worse it looks.
+**The problem:** a large HTML icon appears to sit on the right spot when you are
+zoomed in, then looks badly misplaced when you zoom out — as if it drifts with
+zoom. It does not drift. It has a **constant pixel offset**, and a constant
+24 px error is a few metres of ground at z19 but over a kilometre at z9, which
+is what makes it look zoom-dependent.
 
-**The fix:** always use `offset: { x: 0, y: 0 }` and shift the icon via CSS
-margins instead.
+**The cause:** a `position` on the outermost element of your `icon.html`.
+
+An `icon.html` marker is handed straight to `maplibregl.Marker` with your markup
+inside its element, and MapLibre centres that element on the coordinate with
+`translate(-50%, -50%)`. `position: absolute` (or `fixed`) takes your icon out of
+flow, the wrapper collapses to 0×0, the `-50%` centres nothing, and the icon's
+**top-left** lands on the pin instead of its middle.
+
+**The fix:** no `position` on the outer element, and `offset: { x: 0, y: 0 }`.
+Nothing else. A box symmetric about its own middle is then exact.
 
 ```javascript
 const SIZE = 48; // icon pixel size
 const html =
-  // Outer div: NO position property — this is critical for drift-free placement.
-  // Negative margins centre the box around the geo pin (offset 0,0 = top-left at pin).
-  `<div style="width:${SIZE}px;height:${SIZE}px;margin-left:-${SIZE / 2}px;margin-top:-${SIZE / 2}px">` +
-    // Inner div: position:relative — safe popup/ring anchor, does NOT affect Longdo's placement.
+  // Outer div: NO position property. That is the whole rule — with it absent,
+  // the map centres this box on the coordinate for you.
+  `<div style="width:${SIZE}px;height:${SIZE}px">` +
+    // Inner div: position:relative — safe popup/ring anchor, affects only its
+    // own children, not the map's placement of the outer box.
     `<div style="position:relative;width:${SIZE}px;height:${SIZE}px;cursor:pointer">` +
       `<svg width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">` +
         `<circle cx="24" cy="24" r="12" fill="#27B24B" stroke="white" stroke-width="2"/>` +
@@ -96,11 +107,25 @@ map.Overlays.add(marker);
 ```
 
 **Rules:**
-- The **Longdo icon root** (outermost HTML element) must have **no `position`
-  property**. Even `position:relative` with `offset:{0,0}` can reintroduce drift.
-- Centre via `margin-left` / `margin-top` (negative), not via the `offset` param.
-- Any inner `position:relative` div is fine — it only affects children, not
-  Longdo's placement.
+- The **Longdo icon root** (outermost element of `icon.html`) must have **no
+  `position`**. `position:relative` is harmless; `absolute` / `fixed` put the
+  icon's top-left on the pin.
+- Do **not** add negative margins to centre it. They are a fix for the
+  `position:absolute` case only, and on a correctly built icon they overshoot:
+  a 48 px icon with `margin:-24px` lands 12 px up and 12 px left (the margin
+  shrinks the wrapper the map already centred, so you get half of it back).
+- Use `offset` only when the point that must touch the ground is **not** the
+  middle. A teardrop whose tip is at the bottom of a 48 px box wants
+  `offset: { x: 0, y: -24 }`.
+- Any inner `position:relative` div is fine — it only affects children.
+
+> Measured on `api.longdo.com/map3/` at both renderer versions (`?v=old` →
+> MapLibre 2.4.0 and the current default → 5.7.1), icon sizes 48 px and 200 px,
+> static at nine zooms and across 114 frames of animated zoom with pitch and
+> bearing. Every configuration held its error constant to within 0.35 px, which
+> is MapLibre's pixel rounding — there is no zoom-drift to design around. The
+> only thing that varies between configurations is the constant offset:
+> no `position` → 0 px, negative margins → 12 px, `position:absolute` → 24 px.
 
 ---
 
@@ -120,7 +145,7 @@ function vehicleIconHtml(heading, color) {
        </g>`
     : '';
   return (
-    `<div style="width:48px;height:48px;margin-left:-24px;margin-top:-24px">` +
+    `<div style="width:48px;height:48px">` +
       `<div style="position:relative;width:48px;height:48px;cursor:pointer;` +
                   `filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">` +
         `<svg width="48" height="48" viewBox="0 0 48 48">` +
@@ -138,8 +163,9 @@ function vehicleIconHtml(heading, color) {
 
 ## Cluster / bubble markers
 
-Clusters don't need precise centering, so `offset:{x:0,y:0}` works as-is
-(top-left at geo pin).
+Same rule as any HTML icon — no `position` on the outer element, and
+`offset:{x:0,y:0}` centres the bubble on the cluster's coordinate, which is what
+you want for a bubble.
 
 ```javascript
 function clusterHtml(count) {
@@ -182,11 +208,17 @@ map.Event.bind('overlayClick', ov => {
 
 ## Marker position update
 
-**Do NOT call `marker.location({ lat, lon })` on HTML markers with a centred
-icon.** `location()` repositions the marker without reapplying the icon offset,
-causing drift.
+`marker.location({ lat, lon })` moves an HTML marker in place and keeps its
+placement exact — measured to within a pixel over repeated moves and across
+zooms, on an icon built to the rule above. Prefer it: it is far cheaper than
+rebuilding the element, and it keeps any popup, drag state and DOM listeners.
 
-Instead, remove and recreate the marker when its position changes:
+```javascript
+marker.location({ lat, lon });
+```
+
+If the icon's **appearance** must change too (a new heading, a new colour), the
+markup is what changes, so rebuild it:
 
 ```javascript
 map.Overlays.remove(oldMarker);
