@@ -2,9 +2,10 @@
 name: longdo-map-js
 description: >-
   Tips, patterns, and gotchas for building web maps with the Longdo Map v3
-  JavaScript API — initialisation, HTML markers that don't drift on zoom,
-  directional markers, clustering, click handling, popups, UI components, layer
-  control, geolocation, and place tags. Use when writing or debugging
+  JavaScript API — initialization, HTML markers that sit exactly on their
+  coordinate (fixing apparent zoom-drift), directional markers, clustering,
+  click handling, popups, UI components, layer control, geolocation, and place
+  tags. Use when writing or debugging
   browser/web code that uses the Longdo Map JavaScript API. For the location
   REST APIs (search, geocode, routing, traffic) see the longdo-map-rest skill.
 ---
@@ -28,7 +29,7 @@ naive approaches — several work around real quirks in the v3 renderer.
 
 ---
 
-## Loading the API and initialising a map
+## Loading the API and initializing a map
 
 Include the script with your key, then create the map after the page and the
 API have loaded. Bind to the `ready` event before touching the map.
@@ -70,28 +71,28 @@ API have loaded. Bind to the `ready` event before touching the map.
 **The problem:** a large HTML icon appears to sit on the right spot when you are
 zoomed in, then looks badly misplaced when you zoom out — as if it drifts with
 zoom. It does not drift. It has a **constant pixel offset**, and a constant
-24 px error is a few metres of ground at z19 but over a kilometre at z9, which
+24 px error is a few meters of ground at z19 but over a kilometer at z9, which
 is what makes it look zoom-dependent.
 
 **The cause:** the outermost element of your `icon.html` — usually a `position`
 on it, sometimes a size that doesn't match the drawn icon or a stray margin.
 
 An `icon.html` marker is handed straight to `maplibregl.Marker` with your markup
-inside its element, and MapLibre centres that element on the coordinate with
+inside its element, and MapLibre centers that element on the coordinate with
 `translate(-50%, -50%)`. `position: absolute` (or `fixed`) takes your icon out of
-flow, the wrapper collapses to 0×0, the `-50%` centres nothing, and the icon's
+flow, the wrapper collapses to 0×0, the `-50%` centers nothing, and the icon's
 **top-left** lands on the pin instead of its middle.
 
 **The fix:** give the outer element an explicit `width` / `height` equal to the
 icon's real size, no `position`, no margins, and `offset: { x: 0, y: 0 }`. The
-map then centres it exactly; `offset` is only for icons whose anchor is not the
+map then centers it exactly; `offset` is only for icons whose anchor is not the
 middle (see the table below).
 
 ```javascript
 const SIZE = 48; // icon pixel size
 const html =
   // Outer div: sized to the real icon, NO position, NO margin — the map
-  // centres this box on the coordinate for you.
+  // centers this box on the coordinate for you.
   `<div style="width:${SIZE}px;height:${SIZE}px">` +
     // Inner div: position:relative — safe popup/ring anchor, affects only its
     // own children, not the map's placement of the outer box.
@@ -112,15 +113,15 @@ map.Overlays.add(marker);
 **Rules:**
 - Give the **Longdo icon root** (outermost element of `icon.html`) an explicit
   `width` / `height` equal to the icon's **real visible size**. MapLibre wraps
-  it in its own div and computes the centring from that size, so a root that is
+  it in its own div and computes the centering from that size, so a root that is
   smaller or larger than what you draw (an unsized div, a 48 px box holding a
-  64 px SVG) is centred on the wrong box.
+  64 px SVG) is centered on the wrong box.
 - The root must have **no `position`**. `position:relative` is harmless;
   `absolute` / `fixed` collapse the wrapper and put the icon's top-left on the
   pin.
-- Do **not** add negative margins to centre it. On a correctly built icon they
+- Do **not** add negative margins to center it. On a correctly built icon they
   overshoot: a 48 px icon with `margin:-24px` lands 12 px up and 12 px left
-  (the margin shrinks the wrapper the map already centred, so you get half of
+  (the margin shrinks the wrapper the map already centered, so you get half of
   it back).
 - Use `offset` only when the point that must touch the ground is **not** the
   icon's middle:
@@ -128,23 +129,23 @@ map.Overlays.add(marker);
   | Icon | Anchor point | `offset` |
   |------|--------------|----------|
   | home, circle, badge, cluster bubble | middle | `{ x: 0, y: 0 }` |
-  | pin / teardrop, tip at the bottom edge | bottom-centre | `{ x: 0, y: -H/2 }` (48 px → `y: -24`) |
+  | pin / teardrop, tip at the bottom edge | bottom-center | `{ x: 0, y: -H/2 }` (48 px → `y: -24`) |
 
 - Any inner `position:relative` div is fine — it only affects children.
 
 **If you really need `position:absolute` on the root**, treat it as a separate
 approach, not a tweak of the one above: the wrapper collapses to 0×0, so the
-pin is at the icon's top-left, and you centre it yourself with
+pin is at the icon's top-left, and you center it yourself with
 `margin-left:-W/2; margin-top:-H/2` (still `offset: {0, 0}`, or shift the
-margins for a non-centre anchor). Pick one approach per icon — never mix a
-sized, unpositioned root with centring margins, or `absolute` with the map's
-own centring.
+margins for a non-center anchor). Pick one approach per icon — never mix a
+sized, unpositioned root with centering margins, or `absolute` with the map's
+own centering.
 
 **Debugging a misplaced icon:** movement of sub-pixel to ~1 px while zooming is
 projection and pixel rounding, and is expected. Anything larger is not drift —
 it is a constant offset from the markup. Check, in order: the root's
 **size** (matches the drawn icon?), **margin** (any?), **position** (any on the
-root?), and **offset** (non-zero only for a non-centre anchor?).
+root?), and **offset** (non-zero only for a non-center anchor?).
 
 > Measured on `api.longdo.com/map3/` at both renderer versions (`?v=old` →
 > MapLibre 2.4.0 and the current default → 5.7.1), icon sizes 48 px and 200 px,
@@ -158,7 +159,7 @@ root?), and **offset** (non-zero only for a non-centre anchor?).
 
 ## Directional beak (heading arrow) that stays upright
 
-Rotate a beak polygon inside the SVG around the icon's centre point. The vehicle
+Rotate a beak polygon inside the SVG around the icon's center point. The vehicle
 glyph stays upright because it is NOT inside the rotated `<g>`.
 
 ```javascript
@@ -178,7 +179,7 @@ function vehicleIconHtml(heading, color) {
         `<svg width="48" height="48" viewBox="0 0 48 48">` +
           beak +
           `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="rgba(255,255,255,0.92)" stroke-width="2"/>` +
-          // glyph (a 15×15 SVG path centred in the puck) goes here, NO rotation applied
+          // glyph (a 15×15 SVG path centered in the puck) goes here, NO rotation applied
         `</svg>` +
       `</div>` +
     `</div>`
@@ -190,9 +191,9 @@ function vehicleIconHtml(heading, color) {
 
 ## Cluster / bubble markers
 
-Same rule as any HTML icon — no `position` on the outer element, and
-`offset:{x:0,y:0}` centres the bubble on the cluster's coordinate, which is what
-you want for a bubble.
+Same rule as any HTML icon — the outer element sized to the bubble (the
+`box-shadow` rings don't count; they don't affect layout), no `position`, and
+`offset:{x:0,y:0}` centers the bubble on the cluster's coordinate.
 
 ```javascript
 function clusterHtml(count) {
@@ -244,7 +245,7 @@ rebuilding the element, and it keeps any popup, drag state and DOM listeners.
 marker.location({ lat, lon });
 ```
 
-If the icon's **appearance** must change too (a new heading, a new colour), the
+If the icon's **appearance** must change too (a new heading, a new color), the
 markup is what changes, so rebuild it:
 
 ```javascript
@@ -261,7 +262,7 @@ map.Overlays.add(newMarker);
 Append the popup to the **inner** `position:relative` div (not the Longdo root):
 
 ```javascript
-// CSS (popup floats above the icon, centred horizontally)
+// CSS (popup floats above the icon, centered horizontally)
 // .my-popup { position:absolute; left:50%; bottom:calc(100% + 4px); transform:translateX(-50%); ... }
 
 function openPopup(innerDivId, html) {
@@ -280,7 +281,7 @@ DOM-anchored popup.
 
 ---
 
-## Speed-state colour palette
+## Speed-state color palette
 
 Consistent with Thai traffic conventions used on Longdo Map itself:
 
