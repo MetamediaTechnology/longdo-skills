@@ -133,9 +133,10 @@ final lightLayer = Longdo.LongdoStatic("Layers", "LIGHT");
 map.currentState?.call("Layers.setBase", args: [lightLayer]);
 ```
 
-The drift-free HTML-marker rule from **longdo-map-js** (outer div with no
-`position`, centre via negative margins, `offset:{x:0,y:0}`) applies verbatim —
-you're feeding the same JS marker options, just from Dart maps.
+The HTML-marker anchoring rule from **longdo-map-js** (outer div sized to the
+real icon, no `position`, no negative margins, `offset:{x:0,y:0}` unless the
+anchor isn't the icon's middle) applies verbatim — you're feeding the same JS
+marker options, just from Dart maps.
 
 ## Gotchas
 
@@ -143,11 +144,11 @@ you're feeding the same JS marker options, just from Dart maps.
   `ready` event fires runs against a half-loaded WebView and silently no-ops.
 - **`currentState` can be null** while the widget is building — always
   null-check (`?.`).
-- **Args are JSON.** Anything you pass in `args` must be JSON-serialisable
+- **Args are JSON.** Anything you pass in `args` must be JSON-serializable
   (maps, lists, primitives, or `LongdoObject`/`LongdoStatic` handles). You can't
   pass Dart closures into the map.
 - **Event payloads arrive as strings.** `onMessageReceived` gives you the JS
-  event serialised — parse it (`jsonDecode`) when you need fields.
+  event serialized — parse it (`jsonDecode`) when you need fields.
 - **Two older packages exist** (`longdo_maps_flutter`, `aliceblock/longdo_map`).
   Prefer `longdo_maps_api3_flutter` (published by longdo.com) for new projects.
 

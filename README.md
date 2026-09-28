@@ -10,7 +10,7 @@ conventions, and gotchas to write correct Longdo code.
 
 | Plugin | For | What it covers |
 |--------|-----|----------------|
-| **longdo-map-js** | Web frontend | Longdo Map v3 **JavaScript API** — drift-free HTML markers, directional/cluster markers, click handling, popups, UI, layer control, geolocation, place tags |
+| **longdo-map-js** | Web frontend | Longdo Map v3 **JavaScript API** — HTML markers anchored exactly on their coordinate, directional/cluster markers, click handling, popups, UI, layer control, geolocation, place tags |
 | **longdo-map-rest** | Any language / backend | Location **REST APIs** — search/suggest, geocode, reverse-geocode, routing (guide, GeoJSON, matrix, snap, span, TSP), traffic speed |
 | **longdo-map-flutter** | Mobile | Official `longdo_maps_api3_flutter` **SDK** — `LongdoMapWidget`, events, markers, the Dart ⇄ JS bridge |
 | **longdo-weather** | Any language / backend | Longdo **Weather API** — rain radar, current conditions, wind, forecasts *(endpoint specifics pending — see the skill)* |
