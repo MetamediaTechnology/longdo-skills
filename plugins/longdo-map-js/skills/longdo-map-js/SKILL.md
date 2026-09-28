@@ -73,7 +73,8 @@ zoom. It does not drift. It has a **constant pixel offset**, and a constant
 24 px error is a few metres of ground at z19 but over a kilometre at z9, which
 is what makes it look zoom-dependent.
 
-**The cause:** a `position` on the outermost element of your `icon.html`.
+**The cause:** the outermost element of your `icon.html` — usually a `position`
+on it, sometimes a size that doesn't match the drawn icon or a stray margin.
 
 An `icon.html` marker is handed straight to `maplibregl.Marker` with your markup
 inside its element, and MapLibre centres that element on the coordinate with
@@ -81,14 +82,16 @@ inside its element, and MapLibre centres that element on the coordinate with
 flow, the wrapper collapses to 0×0, the `-50%` centres nothing, and the icon's
 **top-left** lands on the pin instead of its middle.
 
-**The fix:** no `position` on the outer element, and `offset: { x: 0, y: 0 }`.
-Nothing else. A box symmetric about its own middle is then exact.
+**The fix:** give the outer element an explicit `width` / `height` equal to the
+icon's real size, no `position`, no margins, and `offset: { x: 0, y: 0 }`. The
+map then centres it exactly; `offset` is only for icons whose anchor is not the
+middle (see the table below).
 
 ```javascript
 const SIZE = 48; // icon pixel size
 const html =
-  // Outer div: NO position property. That is the whole rule — with it absent,
-  // the map centres this box on the coordinate for you.
+  // Outer div: sized to the real icon, NO position, NO margin — the map
+  // centres this box on the coordinate for you.
   `<div style="width:${SIZE}px;height:${SIZE}px">` +
     // Inner div: position:relative — safe popup/ring anchor, affects only its
     // own children, not the map's placement of the outer box.
@@ -107,17 +110,41 @@ map.Overlays.add(marker);
 ```
 
 **Rules:**
-- The **Longdo icon root** (outermost element of `icon.html`) must have **no
-  `position`**. `position:relative` is harmless; `absolute` / `fixed` put the
-  icon's top-left on the pin.
-- Do **not** add negative margins to centre it. They are a fix for the
-  `position:absolute` case only, and on a correctly built icon they overshoot:
-  a 48 px icon with `margin:-24px` lands 12 px up and 12 px left (the margin
-  shrinks the wrapper the map already centred, so you get half of it back).
+- Give the **Longdo icon root** (outermost element of `icon.html`) an explicit
+  `width` / `height` equal to the icon's **real visible size**. MapLibre wraps
+  it in its own div and computes the centring from that size, so a root that is
+  smaller or larger than what you draw (an unsized div, a 48 px box holding a
+  64 px SVG) is centred on the wrong box.
+- The root must have **no `position`**. `position:relative` is harmless;
+  `absolute` / `fixed` collapse the wrapper and put the icon's top-left on the
+  pin.
+- Do **not** add negative margins to centre it. On a correctly built icon they
+  overshoot: a 48 px icon with `margin:-24px` lands 12 px up and 12 px left
+  (the margin shrinks the wrapper the map already centred, so you get half of
+  it back).
 - Use `offset` only when the point that must touch the ground is **not** the
-  middle. A teardrop whose tip is at the bottom of a 48 px box wants
-  `offset: { x: 0, y: -24 }`.
+  icon's middle:
+
+  | Icon | Anchor point | `offset` |
+  |------|--------------|----------|
+  | home, circle, badge, cluster bubble | middle | `{ x: 0, y: 0 }` |
+  | pin / teardrop, tip at the bottom edge | bottom-centre | `{ x: 0, y: -H/2 }` (48 px → `y: -24`) |
+
 - Any inner `position:relative` div is fine — it only affects children.
+
+**If you really need `position:absolute` on the root**, treat it as a separate
+approach, not a tweak of the one above: the wrapper collapses to 0×0, so the
+pin is at the icon's top-left, and you centre it yourself with
+`margin-left:-W/2; margin-top:-H/2` (still `offset: {0, 0}`, or shift the
+margins for a non-centre anchor). Pick one approach per icon — never mix a
+sized, unpositioned root with centring margins, or `absolute` with the map's
+own centring.
+
+**Debugging a misplaced icon:** movement of sub-pixel to ~1 px while zooming is
+projection and pixel rounding, and is expected. Anything larger is not drift —
+it is a constant offset from the markup. Check, in order: the root's
+**size** (matches the drawn icon?), **margin** (any?), **position** (any on the
+root?), and **offset** (non-zero only for a non-centre anchor?).
 
 > Measured on `api.longdo.com/map3/` at both renderer versions (`?v=old` →
 > MapLibre 2.4.0 and the current default → 5.7.1), icon sizes 48 px and 200 px,
